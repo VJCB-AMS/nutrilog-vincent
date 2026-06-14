@@ -8,7 +8,8 @@ const { Pool } = pkg;
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001', 10);
+console.log(`[startup] process.env.PORT=${process.env.PORT} → listening on ${PORT}`);
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -231,9 +232,9 @@ Use typical nutritional values for common foods. Be reasonable with portion size
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`NutriLog backend running on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`NutriLog backend running on 0.0.0.0:${PORT}`);
   initDB()
     .then(() => console.log('[db] Table ready'))
-    .catch(err => console.error('[db] Init failed — DB queries will error until resolved:', err.message));
+    .catch(err => console.error('[db] Init failed:', err.message));
 });
