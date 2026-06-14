@@ -12,46 +12,21 @@ const PORT = process.env.PORT || 3001;
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-function buildPoolConfig() {
-  const dbUrl = process.env.DATABASE_URL;
+const pgHost = process.env.PGHOST;
+const pgPort = process.env.PGPORT;
+const pgUser = process.env.PGUSER;
+const pgPassword = process.env.PGPASSWORD;
+const pgDatabase = process.env.PGDATABASE;
 
-  if (dbUrl) {
-    const masked = dbUrl.replace(/:([^:@]+)@/, ':****@');
-    console.log(`[db] DATABASE_URL = ${masked}`);
-  } else {
-    console.log('[db] DATABASE_URL is not set');
-  }
+console.log(`[db] PGHOST=${pgHost} PGPORT=${pgPort} PGDATABASE=${pgDatabase} PGUSER=${pgUser}`);
 
-  const isLocal = !dbUrl || dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
+const isRemote = pgHost && pgHost !== 'localhost' && pgHost !== '127.0.0.1';
 
-  if (!isLocal) {
-    return { connectionString: dbUrl, ssl: { rejectUnauthorized: false } };
-  }
-
-  // DATABASE_URL missing or points to localhost — try individual PG vars Railway also injects
-  const pgHost = process.env.PGHOST;
-  const pgPort = process.env.PGPORT;
-  const pgUser = process.env.PGUSER;
-  const pgPassword = process.env.PGPASSWORD;
-  const pgDatabase = process.env.PGDATABASE;
-
-  if (pgHost && pgHost !== 'localhost' && pgHost !== '127.0.0.1') {
-    console.log(`[db] Falling back to PG vars: host=${pgHost} port=${pgPort} db=${pgDatabase}`);
-    return {
-      host: pgHost,
-      port: parseInt(pgPort || '5432', 10),
-      user: pgUser,
-      password: pgPassword,
-      database: pgDatabase,
-      ssl: { rejectUnauthorized: false },
-    };
-  }
-
-  console.log('[db] Connecting to local PostgreSQL (development)');
-  return { connectionString: dbUrl || 'postgresql://localhost:5432/nutrilog' };
-}
-
-const pool = new Pool(buildPoolConfig());
+const pool = new Pool(
+  isRemote
+    ? { host: pgHost, port: parseInt(pgPort || '5432', 10), user: pgUser, password: pgPassword, database: pgDatabase, ssl: { rejectUnauthorized: false } }
+    : { connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/nutrilog' }
+);
 
 async function initDB() {
   await pool.query(`
