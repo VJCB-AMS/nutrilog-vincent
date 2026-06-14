@@ -63,6 +63,9 @@ function mapRow(row) {
 app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
 app.use(express.json({ limit: '20mb' }));
 
+app.get('/', (_req, res) => res.json({ status: 'ok' }));
+app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
 // GET entries for a date
 app.get('/api/entries/:date', async (req, res) => {
   try {
@@ -198,13 +201,9 @@ Use typical nutritional values for common foods. Be reasonable with portion size
   }
 });
 
-initDB()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`NutriLog backend running on port ${PORT}`);
-    });
-  })
-  .catch(err => {
-    console.error('Failed to initialise database:', err);
-    process.exit(1);
-  });
+app.listen(PORT, () => {
+  console.log(`NutriLog backend running on port ${PORT}`);
+  initDB()
+    .then(() => console.log('[db] Table ready'))
+    .catch(err => console.error('[db] Init failed — DB queries will error until resolved:', err.message));
+});
