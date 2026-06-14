@@ -185,21 +185,48 @@ app.post('/api/ai/parse-food', async (req, res) => {
       messages: [
         {
           role: 'user',
-          content: `Parse this food description and return a JSON array of individual food items with nutritional info.
+          content: `You are a precise nutritional analysis assistant for a Dutch user based in the Netherlands/Europe.
+
+Parse this food description and return a JSON array of individual food items with accurate nutritional data.
 
 Food description: "${text}"
-Default meal type (fallback if not specified in text): ${mealType}
+Default meal type (fallback if not specified): ${mealType}
 
-Rules:
-1. Split every distinct food into its own array item.
-2. Detect meal assignments from the text. Examples:
-   - "Breakfast: eggs" → mealType "breakfast"
-   - "Lunch: chicken and rice" → mealType "lunch"
-   - "Dinner: salmon" → mealType "dinner"
-   - "Snack:" or "Snacks:" → mealType "snacks"
-   - Morning/AM context → "breakfast", midday/noon → "lunch", evening/PM/supper → "dinner"
-3. If a food has no meal context in the text, use the default: "${mealType}".
-4. Valid mealType values: "breakfast", "lunch", "dinner", "snacks".
+## REFERENCE DATABASE PRIORITY
+Use this priority order for nutritional values:
+1. NEVO (Dutch/EU nutritional database) — primary source for whole foods, dairy, meat, vegetables, Dutch products
+2. Open Food Facts — for branded/packaged products
+3. USDA FoodData Central — fallback for American products or travel situations
+When unsure, use the most commonly cited value across sources and flag with medium/low confidence.
+
+## EUROPEAN & DUTCH FOOD KNOWLEDGE
+Apply EU-standard portions and compositions:
+- Dutch dairy: whole milk = 3.5% fat, kwark (low-fat quark) ≈ 67 kcal/100g (11g protein, 4g carbs, 0.2g fat), skyr ≈ 65 kcal/100g (11g protein, 4g carbs, 0g fat)
+- Filet américain (raw beef spread) ≈ 190 kcal/100g, 14g protein, 2g carbs, 14g fat
+- Stroopwafel (one wafel, 25g) ≈ 110 kcal, 1g protein, 16g carbs, 4g fat
+- Hagelslag (chocolate sprinkles, 1 tbsp/10g) ≈ 50 kcal, 0.5g protein, 7g carbs, 2g fat
+- Rookworst (smoked sausage, 100g) ≈ 285 kcal, 14g protein, 2g carbs, 25g fat
+- Canelé (one, 60g) ≈ 200 kcal, 4g protein, 32g carbs, 7g fat
+- Baguette (100g) ≈ 270 kcal, 9g protein, 54g carbs, 2g fat
+- Croque monsieur ≈ 430 kcal, 24g protein, 35g carbs, 20g fat
+- EU pasta portions: 80g dry per serving (not 100g as in US)
+- EU bread slice: typically 35g (not 25–28g as in US)
+
+## PORTION SIZING
+- Slightly overestimate rather than underestimate (real portions tend to be larger than listed)
+- Restaurant/dining out: portions are typically 20–30% larger than home portions; note this in the name
+- Home-cooked default unless restaurant context is mentioned
+
+## MEAL ASSIGNMENT
+Detect meal from text context:
+- "Breakfast:" / morning / AM → "breakfast"
+- "Lunch:" / midday / noon → "lunch"
+- "Dinner:" / evening / supper → "dinner"
+- "Snack:" / tussendoor → "snacks"
+- No context → use default: "${mealType}"
+
+## TRAVEL / RESTAURANT FLAG
+If the text mentions a restaurant, dining out, a foreign country, or unfamiliar cuisine — add " (restaurant est.)" to the item name.
 
 Return ONLY a valid JSON array (no markdown, no explanation):
 [
@@ -209,12 +236,13 @@ Return ONLY a valid JSON array (no markdown, no explanation):
     "protein": number,
     "carbs": number,
     "fat": number,
-    "amount": "serving description",
-    "mealType": "breakfast|lunch|dinner|snacks"
+    "amount": "serving description with weight where possible (e.g. '200g', '1 slice (35g)')",
+    "mealType": "breakfast|lunch|dinner|snacks",
+    "confidence": "high|medium|low"
   }
 ]
 
-Use typical nutritional values for common foods. Be reasonable with portion sizes.`
+Confidence guide: high = exact NEVO/branded match; medium = close match or common food; low = unfamiliar/regional/estimated.`
         }
       ]
     });
