@@ -12,21 +12,35 @@ const PORT = process.env.PORT || 3001;
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const pgHost = process.env.PGHOST;
-const pgPort = process.env.PGPORT;
-const pgUser = process.env.PGUSER;
-const pgPassword = process.env.PGPASSWORD;
-const pgDatabase = process.env.PGDATABASE;
+function buildPoolConfig() {
+  const url = process.env.DATABASE_URL;
+  const pgHost = process.env.PGHOST;
 
-console.log(`[db] PGHOST=${pgHost} PGPORT=${pgPort} PGDATABASE=${pgDatabase} PGUSER=${pgUser}`);
+  // Prefer DATABASE_URL if it points somewhere non-local
+  if (url && !url.includes('localhost') && !url.includes('127.0.0.1')) {
+    const masked = url.replace(/:([^:@]+)@/, ':****@');
+    console.log(`[db] Using DATABASE_URL: ${masked}`);
+    return { connectionString: url, ssl: { rejectUnauthorized: false } };
+  }
 
-const isRemote = pgHost && pgHost !== 'localhost' && pgHost !== '127.0.0.1';
+  // Fall back to individual PG vars (Railway also injects these)
+  if (pgHost && pgHost !== 'localhost' && pgHost !== '127.0.0.1') {
+    console.log(`[db] Using PG vars — host=${pgHost} port=${process.env.PGPORT} db=${process.env.PGDATABASE}`);
+    return {
+      host: pgHost,
+      port: parseInt(process.env.PGPORT || '5432', 10),
+      user: process.env.PGUSER,
+      password: process.env.PGPASSWORD,
+      database: process.env.PGDATABASE,
+      ssl: { rejectUnauthorized: false },
+    };
+  }
 
-const pool = new Pool(
-  isRemote
-    ? { host: pgHost, port: parseInt(pgPort || '5432', 10), user: pgUser, password: pgPassword, database: pgDatabase, ssl: { rejectUnauthorized: false } }
-    : { connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/nutrilog' }
-);
+  console.log('[db] No remote DB found — using local PostgreSQL');
+  return { connectionString: url || 'postgresql://localhost:5432/nutrilog' };
+}
+
+const pool = new Pool(buildPoolConfig());
 
 async function initDB() {
   await pool.query(`
@@ -60,7 +74,23 @@ function mapRow(row) {
   };
 }
 
-app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
+// FRONTEND_URL can be a single URL or comma-separated list (e.g. Vercel prod + preview)
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',').map(s => s.trim())
+  : null;
+console.log('[cors] allowed origins:', allowedOrigins ?? '*');
+
+app.use(cors({
+  origin: allowedOrigins
+    ? (origin, cb) => {
+        if (!origin || allowedOrigins.some(o => origin === o || origin.endsWith('.vercel.app'))) {
+          cb(null, true);
+        } else {
+          cb(new Error(`CORS: origin ${origin} not allowed`));
+        }
+      }
+    : '*',
+}));
 app.use(express.json({ limit: '20mb' }));
 
 app.get('/', (_req, res) => res.json({ status: 'ok' }));
