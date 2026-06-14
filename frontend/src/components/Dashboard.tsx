@@ -1,9 +1,9 @@
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { animate } from 'framer-motion';
 import { TrendingUp } from 'lucide-react';
-import { FoodEntry, DailyTotals } from '@/types';
-import { getTargetForDate, getDayType } from '@/lib/targets';
+import { FoodEntry, DailyTotals, DayType } from '@/types';
+import { getDayType } from '@/lib/targets';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Tab } from '@/App';
 
@@ -263,10 +263,21 @@ function getGreeting(): string {
   return 'Good night';
 }
 
+const DAY_TYPE_CYCLE: DayType[] = ['training', 'active', 'rest'];
+
 export default function Dashboard({ entries, selectedDate, onDateChange, onNavigate, loading }: Props) {
   const { targets } = useSettings();
-  const target = getTargetForDate(selectedDate, targets);
-  const dayType = getDayType(new Date(selectedDate + 'T12:00:00'));
+  const [dayTypeOverride, setDayTypeOverride] = useState<DayType | null>(null);
+
+  useEffect(() => { setDayTypeOverride(null); }, [selectedDate]);
+
+  const dayType = dayTypeOverride ?? getDayType(new Date(selectedDate + 'T12:00:00'));
+  const target = targets[dayType];
+
+  const cycleDayType = () => {
+    const next = DAY_TYPE_CYCLE[(DAY_TYPE_CYCLE.indexOf(dayType) + 1) % DAY_TYPE_CYCLE.length];
+    setDayTypeOverride(next);
+  };
 
   const totals = useMemo<DailyTotals>(() => {
     return entries.reduce(
@@ -326,9 +337,13 @@ export default function Dashboard({ entries, selectedDate, onDateChange, onNavig
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${dayTypeColors[dayType]}`}>
+            <button
+              onClick={cycleDayType}
+              title="Tap to change day type"
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-opacity active:opacity-60 ${dayTypeColors[dayType]}`}
+            >
               {target.label}
-            </span>
+            </button>
             <input
               type="date"
               value={selectedDate}
