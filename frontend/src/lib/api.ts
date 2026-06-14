@@ -1,6 +1,7 @@
 import { FoodEntry } from '@/types';
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
+console.log('[api] BASE URL:', BASE);
 
 export async function getEntries(date: string): Promise<FoodEntry[]> {
   const res = await fetch(`${BASE}/entries/${date}`);
